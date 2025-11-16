@@ -9,7 +9,7 @@ fn main() {
     // 初始化Readline
     let reader =  DefaultEditor::new().unwrap();
 
-    // 调用main_loopa
+    // 调用main_loop
     run::main_loop(reader);
 }
 

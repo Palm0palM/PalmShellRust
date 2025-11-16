@@ -8,8 +8,6 @@ use crate::builtins;
 use crate::executor::execute;
 use crate::parser::{parse_line, Command};
 use os_pipe::{pipe, PipeReader, PipeWriter};
-use nix::unistd::{fork, ForkResult};
-use nix::sys::wait::waitpid;
 
 // 主循环的功能是，不断接受输入调用handle_command解析命令，并处理Ctrl+C Ctrl+D
 pub fn main_loop(mut reader: DefaultEditor) {
@@ -86,57 +84,17 @@ fn handle_command(
         }
         Ok(Command::Pipe(former_command, latter_command)) => {
             let (pipe_reader, pipe_writer) = pipe().expect("Failed to create pipe");
-            let former_pid;
-            let latter_pid;
 
-            // Fork for the first command (writer)
-            match unsafe { fork() } {
-                Ok(ForkResult::Parent { child, .. }) => {
-                    former_pid = Some(child);
-                }
-                Ok(ForkResult::Child) => {
-                    // In child 1: redirect stdout to the pipe writer
-                    drop(pipe_reader); // Close unused read end
-                    
-                    // Now handle the command. Its output will go to the pipe.
-                    handle_command(Ok(*former_command), input, Some(pipe_writer));
-                    exit(0);
-                }
-                Err(_) => {
-                    eprintln!("Fork failed");
-                    former_pid = None;
-                }
-            }
+            let handle1 = thread::spawn(||{
+                handle_command(Ok(*former_command), input, Some(pipe_writer));
+            });
 
-            // Fork for the second command (reader)
-            match unsafe { fork() } {
-                Ok(ForkResult::Parent { child, .. }) => {
-                    latter_pid = Some(child);
-                }
-                Ok(ForkResult::Child) => {
-                    // In child 2: redirect stdin to the pipe reader
-                    drop(pipe_writer); // Close unused write end
-                    
-                    // Now handle the command. Its input will come from the pipe.
-                    handle_command(Ok(*latter_command), Some(pipe_reader), output);
-                    exit(0);
-                }
-                Err(_) => {
-                    eprintln!("Fork failed");
-                    latter_pid = None;
-                }
-            }
+            let handle2 = thread::spawn(||{
+                handle_command(Ok(*latter_command), Some(pipe_reader), output);
+            });
 
-            // In parent: close both ends of the pipe and wait for children
-            drop(pipe_reader);
-            drop(pipe_writer);
-
-            if let Some(pid) = former_pid {
-                waitpid(pid, None).expect("Failed to wait for former command");
-            }
-            if let Some(pid) = latter_pid {
-                waitpid(pid, None).expect("Failed to wait for latter command");
-            }
+            handle1.join().expect("Failed to join handle");
+            handle2.join().expect("Failed to join handle");
         }
         Err(e) => {
             eprintln!("psh: parse error: {}", e);
