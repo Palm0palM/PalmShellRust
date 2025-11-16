@@ -51,12 +51,39 @@ fn handle_command(
         }
 
         Ok(Command::Builtin(cmd, args)) => {
+            let mut reader: Box<dyn Read> ;
+            let is_piped;
             // 解析input和output。如果是None，map_or会返回指向默认的标准流句柄的指针
-            let mut reader: Box<dyn Read> = input.map_or(Box::new(io::stdin()), |p| Box::new(p));
-            let mut writer: Box<dyn Write> = output.map_or(Box::new(io::stdout()), |p| Box::new(p));
+            match input {
+                Some(pipe_reader) => {
+                    reader= Box::new(pipe_reader);
+                    is_piped = true;
+                }
+                None => {
+                    reader = Box::new(io::stdin());
+                    is_piped = false;
+                }
+            }
 
-            if !builtins::handle_builtin(&cmd, &args, &mut reader, &mut writer) {
-                eprintln!("Error executing builtin: {}", cmd);
+            let mut writer: Box<dyn Write> = output
+                .map_or(Box::new(io::stdout()), |p| Box::new(p));
+
+
+            let result = match cmd.as_str() {
+                "cd" => builtins::builtin_cd(args, & mut (*reader), & mut (*writer)),
+                "pwd" => builtins::builtin_pwd(args, & mut (*reader), & mut (*writer)),
+                "echo" => {
+                    if is_piped{
+                        builtins::builtin_echo_pipe(args, & mut (*reader), & mut (*writer))
+                    } else {
+                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
+                    }
+                }
+                _ => return,
+            };
+
+            if let Err(e) = result {
+                eprintln!("psh: {}: {}", cmd, e);
             }
         }
 
