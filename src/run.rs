@@ -69,22 +69,26 @@ fn handle_command(
                 .map_or(Box::new(io::stdout()), |p| Box::new(p));
 
 
-            let result = match cmd.as_str() {
-                "cd" => builtins::builtin_cd(args, & mut (*reader), & mut (*writer)),
-                "pwd" => builtins::builtin_pwd(args, & mut (*reader), & mut (*writer)),
+            match cmd.as_str() {
+                "cd" => {
+                    builtins::builtin_cd(args, & mut (*reader), & mut (*writer))
+                }
+                "pwd" => {
+                    builtins::builtin_pwd(args, & mut (*reader), & mut (*writer))
+                }
                 "echo" => {
                     if is_piped{
-                        builtins::builtin_echo_pipe(args, & mut (*reader), & mut (*writer))
+                        builtins::builtin_echo_pipe(args, & mut (*reader), & mut (*writer));
                     } else {
-                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
+                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer));
                     }
                 }
-                _ => return,
+                "ls" => {
+                    builtins::builtin_ls(args, & mut (*reader), & mut (*writer));
+                }
+                _ => return
             };
 
-            if let Err(e) = result {
-                eprintln!("psh: {}: {}", cmd, e);
-            }
         }
 
         Ok(Command::External(program, args)) => {
