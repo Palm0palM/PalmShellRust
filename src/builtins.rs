@@ -1,55 +1,55 @@
 use std::env;
-use std::path::Path;
+use std::io::{self, Read, Write};
 
-pub fn handle_builtin(cmd: &str, args: &[String]) -> bool {
-    match cmd {
-        "cd" => builtin_cd(args),
-        "pwd" => builtin_pwd(),
-        "echo" => builtin_echo(args),
-        _ => false,
-    }
-}
-
-// cd命令
-fn builtin_cd(args: &[String]) -> bool {
-    let target_dir = if let Some(path) = args.get(0) {
-        path.clone()
-    } else {
-        // 默认移动到HOME
-        match env::var("HOME") {
-            Ok(home_dir) => home_dir,
-            Err(_) => {
-                eprintln!("cd: HOME variable not set");
-                return false;
-            }
-        }
+pub fn handle_builtin(
+    cmd: &str,
+    args: &[String],
+    stdin: &mut dyn Read,
+    stdout: &mut dyn Write,
+) -> bool {
+    let result = match cmd {
+        "cd" => builtin_cd(args, stdin, stdout),
+        "pwd" => builtin_pwd(args, stdin, stdout),
+        "echo" => builtin_echo(args, stdin, stdout),
+        _ => return false,
     };
 
-    let path = Path::new(&target_dir);
-    if let Err(e) = env::set_current_dir(path) {
-        eprintln!("cd: {}: {}", target_dir, e);
+    if let Err(e) = result {
+        eprintln!("psh: {}: {}", cmd, e);
         return false;
     }
+
     true
 }
 
-// pwd命令
-fn builtin_pwd() -> bool {
-    match env::current_dir() {
-        Ok(path) => {
-            println!("{}", path.display());
-            true
-        }
-        Err(e) => {
-            eprintln!("pwd: {}", e);
-            false
+// cd command
+fn builtin_cd(args: &[String], _stdin: &mut dyn Read, _stdout: &mut dyn Write) -> io::Result<()> {
+    let target_dir = match args.first() {
+        Some(path) => path.clone(),
+        // 默认移动到HOME路径
+        None => env::var("HOME").unwrap_or_else(|_| "/".to_string()),
+    };
+    env::set_current_dir(target_dir)
+}
+
+// pwd command
+fn builtin_pwd(_args: &[String], _stdin: &mut dyn Read, stdout: &mut dyn Write) -> io::Result<()> {
+    let path = env::current_dir()?;
+    writeln!(stdout, "{}", path.display())
+}
+
+// echo command
+fn builtin_echo(args: &[String], _stdin: &mut dyn Read, stdout: &mut dyn Write) -> io::Result<()> {
+    let mut output = args.join(" ");
+
+    // echo会试图从stdin中读取内容
+    let mut buffer = String::new();
+    if _stdin.read_to_string(&mut buffer).is_ok() {
+        if !buffer.is_empty() {
+            output.push(' ');
+            output.push_str(&buffer.trim());
         }
     }
-}
 
-// echo命令
-fn builtin_echo(args: &[String]) -> bool {
-    let output = args.join(" ");
-    println!("{}", output);
-    true
+    writeln!(stdout, "{}", output)
 }
