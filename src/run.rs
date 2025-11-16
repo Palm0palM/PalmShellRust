@@ -50,7 +50,7 @@ fn handle_command(
             exit(0);
         }
 
-        Ok(Command::Builtin(cmd, args)) => {
+        Ok(Command::Builtin(cmd, mut args)) => {
             let mut reader: Box<dyn Read> ;
             let is_piped;
             // 解析input和output。如果是None，map_or会返回指向默认的标准流句柄的指针
@@ -69,26 +69,31 @@ fn handle_command(
                 .map_or(Box::new(io::stdout()), |p| Box::new(p));
 
 
-            match cmd.as_str() {
-                "cd" => {
-                    builtins::builtin_cd(args, & mut (*reader), & mut (*writer))
-                }
-                "pwd" => {
-                    builtins::builtin_pwd(args, & mut (*reader), & mut (*writer))
-                }
+            let result = match cmd.as_str() {
+                "cd" => builtins::builtin_cd(args, & mut (*reader), & mut (*writer)),
+                "pwd" => builtins::builtin_pwd(args, & mut (*reader), & mut (*writer)),
                 "echo" => {
                     if is_piped{
-                        builtins::builtin_echo_pipe(args, & mut (*reader), & mut (*writer));
+                        builtins::builtin_echo_piped(args, & mut (*reader), & mut (*writer))
                     } else {
-                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer));
+                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
+                    }
+                },
+                "ls" => builtins::builtin_ls(args, & mut (*reader), & mut (*writer)),
+                "grep" => {
+                    if is_piped{
+                        builtins::builtin_grep_piped(&mut args, & mut (*reader), & mut (*writer))
+                    } else {
+                        builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
                     }
                 }
-                "ls" => {
-                    builtins::builtin_ls(args, & mut (*reader), & mut (*writer));
-                }
-                _ => return
+                _ => return,
             };
 
+            match result {
+                Ok(()) => return,
+                Err(_) => return,
+            };
         }
 
         Ok(Command::External(program, args)) => {
