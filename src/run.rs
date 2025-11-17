@@ -17,7 +17,7 @@ pub fn main_loop(mut reader: DefaultEditor) {
         match read_result {
             Ok(line) => {
                 reader.add_history_entry(line.as_str())
-                    .expect("Failed to add history");
+                    .expect("psh: failed to add history");
                 handle_command(parse_line(&line), None, None);
             }
 
@@ -29,7 +29,7 @@ pub fn main_loop(mut reader: DefaultEditor) {
             // 默认行为为退出程序
             Err(ReadlineError::Eof) => exit(0),
             Err(err) => {
-                println!("Error: {:?}", err);
+                println!("psh: error when reading command: {:?}", err);
                 break;
             }
         }
@@ -46,7 +46,7 @@ fn handle_command(
     match cmd {
         Ok(Command::Empty) => return,
         Ok(Command::Exit) => {
-            println!("Exiting...");
+            println!("psh: exiting...");
             exit(0);
         }
 
@@ -74,7 +74,8 @@ fn handle_command(
                 "pwd" => builtins::builtin_pwd(args, & mut (*reader), & mut (*writer)),
                 "echo" => {
                     if is_piped{
-                        builtins::builtin_echo_piped(args, & mut (*reader), & mut (*writer))
+                        builtins::read_from_pipe(& mut args, & mut (*reader));
+                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
                     } else {
                         builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
                     }
@@ -82,7 +83,8 @@ fn handle_command(
                 "ls" => builtins::builtin_ls(args, & mut (*reader), & mut (*writer)),
                 "grep" => {
                     if is_piped{
-                        builtins::builtin_grep_piped(&mut args, & mut (*reader), & mut (*writer))
+                        builtins::read_from_pipe(& mut args, & mut (*reader));
+                        builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
                     } else {
                         builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
                     }
@@ -92,7 +94,7 @@ fn handle_command(
 
             match result {
                 Ok(()) => return,
-                Err(_) => return,
+                Err(e) => println!("psh: error when executing builtin: {}", e),
             };
         }
 
@@ -107,7 +109,7 @@ fn handle_command(
                     eprintln!("psh: failed to wait on process: {}", e);
                 }
             } else {
-                eprintln!("Error executing command: {}", program);
+                eprintln!("psh: error executing command: {}", program);
             }
         }
         Ok(Command::Background(boxed_command)) => {
@@ -119,7 +121,7 @@ fn handle_command(
             });
         }
         Ok(Command::Pipe(former_command, latter_command)) => {
-            let (pipe_reader, pipe_writer) = pipe().expect("Failed to create pipe");
+            let (pipe_reader, pipe_writer) = pipe().expect("psh: failed to create pipe");
 
             let handle1 = thread::spawn(||{
                 handle_command(Ok(*former_command), input, Some(pipe_writer));
@@ -129,8 +131,8 @@ fn handle_command(
                 handle_command(Ok(*latter_command), Some(pipe_reader), output);
             });
 
-            handle1.join().expect("Failed to join handle");
-            handle2.join().expect("Failed to join handle");
+            handle1.join().expect("psh: failed to join handle of first command in pipe");
+            handle2.join().expect("psh: failed to join handle of first command in pipe");
         }
         Err(e) => {
             eprintln!("psh: parse error: {}", e);

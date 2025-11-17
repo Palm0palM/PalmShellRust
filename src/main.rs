@@ -4,6 +4,7 @@ mod parser;
 mod builtins;
 mod executor;
 mod run;
+mod error;
 
 fn main() {
     // 初始化Readline
