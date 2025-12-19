@@ -4,7 +4,6 @@ use std::io::{self, Read, Write};
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use rand::seq::IndexedRandom;
-use colorgrad::Gradient;
 use colored::Colorize;
 
 use crate::builtins;
@@ -157,7 +156,7 @@ fn get_prompt() -> String {
 
     // 用户名&主机
     let hostname = whoami::fallible::hostname().unwrap_or("unknown_hostname".to_string());
-    let username_at_hostname = (username + "@" + &hostname).on_blue();
+    let username_at_hostname = username + "@" + &hostname;
 
     // 当前路径
     let current_dir_path = env::current_dir().unwrap_or_default();
@@ -171,48 +170,10 @@ fn get_prompt() -> String {
     let now = chrono::Local::now();
     let time = now.format("%d/%m/%Y %H:%M").to_string();
 
-
-    let grad_rainbow = colorgrad::preset::rainbow();
-    let grad_viridis = colorgrad::preset::viridis();
     // 最终样式:
     // username @ hostname [time] $
     format!(
         "{} {} [{}]\n{} ",
-        username_at_hostname, apply_gradient(display_dir, &grad_rainbow), apply_gradient(time, &grad_viridis), prompt
+        username_at_hostname.on_blue(), display_dir.green(), time.yellow(), prompt
     )
-}
-
-fn apply_gradient(text: String, grad: &impl Gradient) -> String {
-    let char_count = text.chars().count();
-    if char_count == 0 {
-        return "".to_string();
-    }
-
-    text.chars()
-        .enumerate()
-        .map(|(i, c)| {
-            let t = if char_count == 1 {
-                0.5
-            } else {
-                i as f32 / (char_count - 1) as f32
-            };
-
-            let [r, g, b, _] = grad.at(t).to_rgba8();
-
-            format!("{}", c.to_string().truecolor(r, g, b))
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests{
-    use super::*;
-
-    #[test]
-    fn grad_test(){
-        let grad = colorgrad::preset::rainbow();
-        let text : String = "This is prompt".to_string();
-        println!("{}:", apply_gradient(text, &grad));
-    }
-
 }
