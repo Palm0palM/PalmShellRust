@@ -1,10 +1,14 @@
 use std::{env, thread};
-use colored::Colorize;
 use std::process::{Stdio, exit};
 use std::io::{self, Read, Write};
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
+use rand::seq::IndexedRandom;
+use colorgrad::Gradient;
+use colored::Colorize;
+
 use crate::builtins;
+use crate::error::ShellError;
 use crate::executor::execute;
 use crate::parser::{parse_line, Command};
 use os_pipe::{pipe, PipeReader, PipeWriter};
@@ -17,7 +21,7 @@ pub fn main_loop(mut reader: DefaultEditor) {
         match read_result {
             Ok(line) => {
                 reader.add_history_entry(line.as_str())
-                    .expect("psh: failed to add history");
+                    .expect("Failed to add history");
                 handle_command(parse_line(&line), None, None);
             }
 
@@ -29,7 +33,7 @@ pub fn main_loop(mut reader: DefaultEditor) {
             // 默认行为为退出程序
             Err(ReadlineError::Eof) => exit(0),
             Err(err) => {
-                println!("psh: error when reading command: {:?}", err);
+                println!("Error: {:?}", err);
                 break;
             }
         }
@@ -39,14 +43,14 @@ pub fn main_loop(mut reader: DefaultEditor) {
 // input 和 output 表示命令的输入输出流
 // 如果默认用标准流输入输出（而不Pipe设置的流）的话，二者会被设置为None
 fn handle_command(
-    cmd: Result<Command, String>,
+    cmd: Result<Command, ShellError>,
     input: Option<PipeReader>,
     output: Option<PipeWriter>,
 ) {
     match cmd {
         Ok(Command::Empty) => return,
         Ok(Command::Exit) => {
-            println!("psh: exiting...");
+            println!("Exiting...");
             exit(0);
         }
 
@@ -74,8 +78,7 @@ fn handle_command(
                 "pwd" => builtins::builtin_pwd(args, & mut (*reader), & mut (*writer)),
                 "echo" => {
                     if is_piped{
-                        builtins::read_from_pipe(& mut args, & mut (*reader));
-                        builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
+                        builtins::builtin_echo_piped(args, & mut (*reader), & mut (*writer))
                     } else {
                         builtins::builtin_echo(args, & mut (*reader), & mut (*writer))
                     }
@@ -83,8 +86,7 @@ fn handle_command(
                 "ls" => builtins::builtin_ls(args, & mut (*reader), & mut (*writer)),
                 "grep" => {
                     if is_piped{
-                        builtins::read_from_pipe(& mut args, & mut (*reader));
-                        builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
+                        builtins::builtin_grep_piped(&mut args, & mut (*reader), & mut (*writer))
                     } else {
                         builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
                     }
@@ -92,10 +94,9 @@ fn handle_command(
                 _ => return,
             };
 
-            match result {
-                Ok(()) => return,
-                Err(e) => println!("psh: error when executing builtin: {}", e),
-            };
+            if let Err(e) = result {
+                eprintln!("psh: {}", e);
+            }
         }
 
         Ok(Command::External(program, args)) => {
@@ -103,13 +104,15 @@ fn handle_command(
             let stdin = input.map_or(Stdio::inherit(), Stdio::from);
             let stdout = output.map_or(Stdio::inherit(), Stdio::from);
 
-            if let Ok(mut child) = execute(&program, args, stdin, stdout) {
-                // 默认行为是等待子进程完成
-                if let Err(e) = child.wait() {
-                    eprintln!("psh: failed to wait on process: {}", e);
+            match execute(&program, args, stdin, stdout) {
+                Ok(mut child) => {
+                    if let Err(e) = child.wait() {
+                        eprintln!("psh: failed to wait on process: {}", e);
+                    }
                 }
-            } else {
-                eprintln!("psh: error executing command: {}", program);
+                Err(e) => {
+                    eprintln!("psh: {}", e);
+                }
             }
         }
         Ok(Command::Background(boxed_command)) => {
@@ -121,7 +124,7 @@ fn handle_command(
             });
         }
         Ok(Command::Pipe(former_command, latter_command)) => {
-            let (pipe_reader, pipe_writer) = pipe().expect("psh: failed to create pipe");
+            let (pipe_reader, pipe_writer) = pipe().expect("Failed to create pipe");
 
             let handle1 = thread::spawn(||{
                 handle_command(Ok(*former_command), input, Some(pipe_writer));
@@ -131,33 +134,85 @@ fn handle_command(
                 handle_command(Ok(*latter_command), Some(pipe_reader), output);
             });
 
-            handle1.join().expect("psh: failed to join handle of first command in pipe");
-            handle2.join().expect("psh: failed to join handle of first command in pipe");
+            handle1.join().expect("Failed to join handle");
+            handle2.join().expect("Failed to join handle");
         }
         Err(e) => {
-            eprintln!("psh: parse error: {}", e);
+            eprintln!("psh: {}", e);
         }
     }
 }
 
 fn get_prompt() -> String {
+    // 提示符
+    let prompt_choices = ["😀", "😃", "😅", "🥲", "🤯", "😝", "😚", "🤥", "💩", "🤡", "🥱", "😔", "🥳", "🤪", "🥰", "😇"];
+    let prompt;
     let username = whoami::username();
+    if username == "root".to_string() {
+        prompt = "\u{1F680}";
+    } else {
+        let mut rng = rand::rng();
+        prompt = prompt_choices.choose(&mut rng).unwrap();
+    }
+
+    // 用户名&主机
     let hostname = whoami::fallible::hostname().unwrap_or("unknown_hostname".to_string());
     let username_at_hostname = (username + "@" + &hostname).on_blue();
+
+    // 当前路径
     let current_dir_path = env::current_dir().unwrap_or_default();
     let current_dir_str = current_dir_path.to_str().unwrap_or("unknown_current_directory").to_string();
     let display_dir = match env::var("HOME") {
         Ok(home_dir) => current_dir_str.replace(&home_dir, "~"),
         Err(_) => current_dir_str.to_string(),
-    }.green();
+    };
 
+    // 当前时间
     let now = chrono::Local::now();
-    let time = now.format("%d/%m/%Y %H:%M").to_string().yellow();
+    let time = now.format("%d/%m/%Y %H:%M").to_string();
 
+
+    let grad_rainbow = colorgrad::preset::rainbow();
+    let grad_viridis = colorgrad::preset::viridis();
     // 最终样式:
     // username @ hostname [time] $
     format!(
-        "{} {} [{}]\n$ ",
-        username_at_hostname, display_dir, time
+        "{} {} [{}]\n{} ",
+        username_at_hostname, apply_gradient(display_dir, &grad_rainbow), apply_gradient(time, &grad_viridis), prompt
     )
+}
+
+fn apply_gradient(text: String, grad: &impl Gradient) -> String {
+    let char_count = text.chars().count();
+    if char_count == 0 {
+        return "".to_string();
+    }
+
+    text.chars()
+        .enumerate()
+        .map(|(i, c)| {
+            let t = if char_count == 1 {
+                0.5
+            } else {
+                i as f32 / (char_count - 1) as f32
+            };
+
+            let [r, g, b, _] = grad.at(t).to_rgba8();
+
+            format!("{}", c.to_string().truecolor(r, g, b))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn grad_test(){
+        let grad = colorgrad::preset::rainbow();
+        let text : String = "This is prompt".to_string();
+        println!("{}:", apply_gradient(text, &grad));
+    }
+
 }

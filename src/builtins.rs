@@ -1,11 +1,11 @@
 use std::env;
 use std::fs;
 use std::io::{Read, Write};
-use crate::error::BuiltinError;
+use crate::error::ShellError;
 
 
 // TODO: 优化错误处理
-pub fn builtin_cd(args: Vec<String>, _stdin: &mut dyn Read, _stdout: &mut dyn Write)-> Result<(), Box<dyn std::error::Error>>{
+pub fn builtin_cd(args: Vec<String>, _stdin: &mut dyn Read, _stdout: &mut dyn Write)-> Result<(), ShellError>{
     let target_dir = match args.first() {
         Some(path) => path.clone(),
         // 默认移动到HOME路径
@@ -16,21 +16,30 @@ pub fn builtin_cd(args: Vec<String>, _stdin: &mut dyn Read, _stdout: &mut dyn Wr
     Ok(())
 }
 
-pub fn builtin_pwd(_args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), Box<dyn std::error::Error>>{
+pub fn builtin_pwd(_args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), ShellError>{
     let path = env::current_dir()?;
     writeln!(stdout, "{}", path.display())?;
 
     Ok(())
 }
 
-pub fn builtin_echo(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>>{
+pub fn builtin_echo(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), ShellError>{
     let output = args.join(" ");
     writeln!(stdout, "{}", output)?;
 
     Ok(())
 }
 
-pub fn builtin_ls(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>>{
+pub fn builtin_echo_piped(mut args: Vec<String>, stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), ShellError> {
+    let mut buf = String::new();
+    stdin.read_to_string(&mut buf)?;
+    args.push(buf);
+    let output = args.join(" ");
+    writeln!(stdout, "{}", output)?;
+    Ok(())
+}
+
+pub fn builtin_ls(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), ShellError>{
     let obj_path = match args.first() {
         Some(path) => path.clone(),
         None => ".".into(),
@@ -44,9 +53,9 @@ pub fn builtin_ls(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Wri
 
     Ok(())
 }
-pub fn builtin_grep(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), Box<dyn std::error::Error>>{
+pub fn builtin_grep(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), ShellError>{
     if args.len() < 2{
-        return Err(Box::new(BuiltinError::ArgsLack(2)));
+        return Err(ShellError::BuiltinError("grep requires a pattern and a file".to_string()));
     }
     let mut results = Vec::new();
     let query = args.remove(0);
@@ -66,12 +75,19 @@ pub fn builtin_grep(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut
     Ok(())
 }
 
+pub fn builtin_grep_piped(args: &mut Vec<String>, stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), ShellError> {
+    if args.is_empty() {
+        return Err(ShellError::BuiltinError("grep requires a pattern".to_string()));
+    }
+    let pattern = args.remove(0);
+    let mut input = String::new();
+    stdin.read_to_string(&mut input)?;
 
-pub fn read_from_pipe(args: & mut Vec<String>, _stdin: &mut dyn Read){
-    let mut buffer = String::new();
-    if _stdin.read_to_string(&mut buffer).is_ok() {
-        if !buffer.is_empty() {
-            args.push(buffer);
+    for line in input.lines() {
+        if line.contains(&pattern) {
+            writeln!(stdout, "{}", line)?;
         }
     }
+
+    Ok(())
 }

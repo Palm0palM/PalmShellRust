@@ -1,15 +1,28 @@
-use std::fmt;
+use std::io;
 
 #[derive(Debug)]
-pub enum BuiltinError{
-    ArgsLack(u32),
+pub enum ShellError {
+    ParseError(String),
+    BuiltinError(String),
+    IoError(io::Error),
+    ExecuteError(String),
 }
-impl fmt::Display for BuiltinError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+
+impl std::fmt::Display for ShellError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            BuiltinError::ArgsLack(num) => write!(f, "({} arguments lacked)", num),
-        }?;
-        Ok(())
+            ShellError::ParseError(msg) => write!(f, "psh: Parse Error: {}", msg),
+            ShellError::BuiltinError(msg) => write!(f, "psh: Builtin Error: {}", msg),
+            ShellError::IoError(err) => write!(f, "psh: IO Error: {}", err),
+            ShellError::ExecuteError(msg) => write!(f, "psh: Execute Error: {}", msg),
+        }
     }
 }
-impl std::error::Error for BuiltinError{ }
+
+impl std::error::Error for ShellError {}
+
+impl From<io::Error> for ShellError {
+    fn from(err: io::Error) -> ShellError {
+        ShellError::IoError(err)
+    }
+}

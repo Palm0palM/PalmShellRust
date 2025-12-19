@@ -1,3 +1,5 @@
+use crate::error::ShellError;
+
 // 这个Enum定义了Command的状态
 #[derive(Debug)]
 pub enum Command {
@@ -13,7 +15,7 @@ pub enum Command {
 // 在这种parse机制的处理逻辑中，& 符号会作用于多个管道连接起来的整体
 // 如果在管道连接的命令内部使用&，如 cmd & | cmd & 的形式，会出现解析错误
 // TODO: 处理管道命令内部使用&的情况
-pub fn parse_line(line: &str) -> Result<Command, String> {
+pub fn parse_line(line: &str) -> Result<Command, ShellError> {
     // 去除空格
     let mut line = line.trim();
     let is_background:bool;
@@ -38,7 +40,7 @@ pub fn parse_line(line: &str) -> Result<Command, String> {
 }
 
 // 解析命令。单独拿出这个函数是方便递归地嵌套Pipe
-fn parse_command(cmd : &str, is_background: bool) -> Result<Command, String>{
+fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>{
     // 如果存在管道符号，那就从从第一个管道处拆分出左右两个子串
     if let Some((first_cmd, other)) = cmd.split_once('|'){
         // 递归地解析两个字串
@@ -66,7 +68,7 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, String>{
         let command = match cmd_name.as_str() {
             "exit" => Command::Exit,
             "quit" => Command::Empty,
-            "cd" | "pwd" | "echo" => Command::Builtin(cmd_name, args),
+            "cd" | "pwd" | "echo" | "ls" | "grep" => Command::Builtin(cmd_name, args),
             _ => Command::External(cmd_name, args),
         };
 
@@ -75,10 +77,10 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, String>{
 }
 
 // 包装函数。如果是后台命令，返回一个Command::Background包裹的Command
-fn test_background(command: Command, is_background: bool) -> Result<Command, String>{
+fn test_background(command: Command, is_background: bool) -> Result<Command, ShellError>{
     if is_background {
         match command {
-            Command::Exit | Command::Empty => Err("Cannot run in background".to_string()),
+            Command::Exit | Command::Empty => Err(ShellError::ParseError("Cannot run in background".to_string())),
             _ => Ok(Command::Background(Box::new(command))),
         }
     } else {
