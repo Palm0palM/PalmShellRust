@@ -5,12 +5,13 @@ use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use rand::seq::IndexedRandom;
 use colored::Colorize;
+use os_pipe::{pipe, PipeReader, PipeWriter};
 
 use crate::builtins;
 use crate::error::ShellError;
 use crate::executor::execute;
 use crate::parser::{parse_line, Command};
-use os_pipe::{pipe, PipeReader, PipeWriter};
+
 
 // 主循环的功能是，不断接受输入调用handle_command解析命令，并处理Ctrl+C Ctrl+D
 pub fn main_loop(mut reader: DefaultEditor) {
@@ -90,6 +91,7 @@ fn handle_command(
                         builtins::builtin_grep(&mut args, & mut (*reader), & mut (*writer))
                     }
                 }
+                "chat" => builtins::builtin_model_call(&mut args, & mut (*reader), & mut (*writer)),
                 _ => return,
             };
 

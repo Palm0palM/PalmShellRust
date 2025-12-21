@@ -6,6 +6,7 @@ pub enum ShellError {
     BuiltinError(String),
     IoError(io::Error),
     ExecuteError(String),
+    LLMError(String),
 }
 
 impl std::fmt::Display for ShellError {
@@ -15,6 +16,7 @@ impl std::fmt::Display for ShellError {
             ShellError::BuiltinError(msg) => write!(f, "psh: Builtin Error: {}", msg),
             ShellError::IoError(err) => write!(f, "psh: IO Error: {}", err),
             ShellError::ExecuteError(msg) => write!(f, "psh: Execute Error: {}", msg),
+            ShellError::LLMError(msg) => write!(f, "psh: LLM Error: {}", msg),
         }
     }
 }

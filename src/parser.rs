@@ -68,7 +68,7 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>
         let command = match cmd_name.as_str() {
             "exit" => Command::Exit,
             "quit" => Command::Empty,
-            "cd" | "pwd" | "echo" | "ls" | "grep" => Command::Builtin(cmd_name, args),
+            "cd" | "pwd" | "echo" | "ls" | "grep" | "chat" => Command::Builtin(cmd_name, args),
             _ => Command::External(cmd_name, args),
         };
 

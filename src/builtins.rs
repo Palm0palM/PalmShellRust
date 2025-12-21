@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::io::{Read, Write};
 use crate::error::ShellError;
-
+use crate::model_call::llm_call;
 
 // TODO: 优化错误处理
 pub fn builtin_cd(args: Vec<String>, _stdin: &mut dyn Read, _stdout: &mut dyn Write)-> Result<(), ShellError>{
@@ -88,6 +88,17 @@ pub fn builtin_grep_piped(args: &mut Vec<String>, stdin: &mut dyn Read, stdout: 
             writeln!(stdout, "{}", line)?;
         }
     }
+
+    Ok(())
+}
+
+pub fn builtin_model_call(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), ShellError> {
+    writeln!(stdout, "Thinking...")?;
+
+    let rt = tokio::runtime::Runtime::new()?;
+
+    let response = rt.block_on(llm_call(args.join(" ")))?;
+    writeln!(stdout, "{}", response)?;
 
     Ok(())
 }
