@@ -42,15 +42,13 @@ fn apply_gradient(text: &str, gradient: &dyn Gradient) -> String {
 
 pub fn get_prompt() -> String {
     // 提示符
-    let prompt_choices = ["😀", "😃", "😅", "🥲", "🤯", "😝", "😚", "🤥", "💩", "🤡", "🥱", "😔", "🥳", "🤪", "🥰", "😇"];
     let mut prompt= String::new();
     let username = whoami::username();
-    if username == "root".to_string() {
-        prompt = "\u{1F680} #".to_string();
+    prompt = if username == "root".to_string() {
+        "\u{1F680} #".to_string()
     } else {
-        let mut rng = rand::rng();
-        prompt = prompt_choices.choose(&mut rng).unwrap().to_string() + " $";
-    }
+        get_emoji() + " $"
+    };
 
     // 用户名&主机
     let hostname = whoami::fallible::hostname().unwrap_or("unknown_hostname".to_string());
@@ -86,4 +84,14 @@ pub fn get_prompt() -> String {
         "{} {} [{}]\n{} ",
         styled_username, styled_dir, styled_time, prompt
     )
+}
+
+pub fn get_emoji() -> String{
+    let emoji_choices = ["😀", "😃", "😅", "🥲", "🤯", "😝", "😚", "🤥", "💩", "🤡",
+                                  "🥱", "😔", "🥳", "🤪", "🥰", "😇", "🫢", "🫠", "🤕", "🤠",
+                                  "🤑", "👽", "😈", "🤖", "😮", "😋", "😉", "🙃", "😇", "😃",
+                                  "👻", "😶", "😑", "😶‍🌫️", "🙂‍↕️", "🥶", "☺️", "🥹", "😁", "😮‍💨",
+                                  "🦀", "🦀", "🦀", "🦀", "🦀", "🦀"];
+    let mut rng = rand::rng();
+    emoji_choices.choose(&mut rng).unwrap().to_string()
 }

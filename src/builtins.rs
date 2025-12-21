@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Write;
 use crate::error::ShellError;
 use crate::model_call::llm_call;
+use crate::prompt;
 
 pub fn builtin_cd(args: Vec<String>, _piped_input: Option<String>, _stdout: &mut dyn Write) -> Result<(), ShellError> {
     let target_dir = match args.first() {
@@ -84,7 +85,7 @@ pub fn builtin_model_call(args: Vec<String>, _piped_input: Option<String>, stdou
         return Err(ShellError::BuiltinError("chat requires a message".to_string()));
     }
 
-    writeln!(stdout, "Thinking...")?;
+    writeln!(stdout, "\n{} Thinking...", prompt::get_emoji())?;
 
     let rt = tokio::runtime::Runtime::new()?;
 
