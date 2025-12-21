@@ -8,6 +8,7 @@ mod executor;
 mod run;
 mod error;
 mod model_call;
+mod prompt;
 
 fn main() {
     // Banner
