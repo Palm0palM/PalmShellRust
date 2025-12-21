@@ -55,7 +55,7 @@ pub fn builtin_ls(args: Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Wri
 }
 pub fn builtin_grep(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), ShellError>{
     if args.len() < 2{
-        return Err(ShellError::BuiltinError("grep requires a pattern and a file".to_string()));
+        return Err(ShellError::BuiltinError("Grep requires a pattern and a file".to_string()));
     }
     let mut results = Vec::new();
     let query = args.remove(0);
@@ -77,7 +77,7 @@ pub fn builtin_grep(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut
 
 pub fn builtin_grep_piped(args: &mut Vec<String>, stdin: &mut dyn Read, stdout: &mut dyn Write) -> Result<(), ShellError> {
     if args.is_empty() {
-        return Err(ShellError::BuiltinError("grep requires a pattern".to_string()));
+        return Err(ShellError::BuiltinError("Grep requires a pattern".to_string()));
     }
     let pattern = args.remove(0);
     let mut input = String::new();
@@ -93,6 +93,9 @@ pub fn builtin_grep_piped(args: &mut Vec<String>, stdin: &mut dyn Read, stdout: 
 }
 
 pub fn builtin_model_call(args: & mut Vec<String>, _stdin: &mut dyn Read, stdout: &mut dyn Write)-> Result<(), ShellError> {
+    if args.is_empty() {
+        return Err(ShellError::BuiltinError("Chat requires a message".to_string()));
+    }
     writeln!(stdout, "Thinking...")?;
 
     let rt = tokio::runtime::Runtime::new()?;
