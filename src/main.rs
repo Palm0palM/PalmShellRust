@@ -9,6 +9,7 @@ mod run;
 mod error;
 mod model_call;
 mod prompt;
+mod args_analysis;
 
 fn main() {
     // Banner
@@ -20,7 +21,7 @@ fn main() {
  | |  | (_| | | | | | | |____) | | | |  __/ | |
  |_|   \__,_|_|_| |_| |_|_____/|_| |_|\___|_|_|
 
- Welcome to PalmShell!
+             Welcome to PalmShell!
 
 "#;
     // 用渐变色打印Banner

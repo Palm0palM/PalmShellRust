@@ -7,6 +7,7 @@ pub enum ShellError {
     IoError(io::Error),
     ExecuteError(String),
     LLMError(String),
+    RedirectionError(String),
 }
 
 impl std::fmt::Display for ShellError {
@@ -17,6 +18,7 @@ impl std::fmt::Display for ShellError {
             ShellError::IoError(err) => write!(f, "IO Error: {}", err),
             ShellError::ExecuteError(msg) => write!(f, "Execute Error: {}", msg),
             ShellError::LLMError(msg) => write!(f, "LLM Error: {}", msg),
+            ShellError::RedirectionError(msg) => write!(f, "Redirection Error: {}", msg),
         }
     }
 }

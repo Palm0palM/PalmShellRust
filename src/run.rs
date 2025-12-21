@@ -1,15 +1,16 @@
 use std::thread;
 use std::process::{Stdio, exit};
 use std::io::{self, Read, Write};
+use std::fs::File;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
-
 use os_pipe::{pipe, PipeReader, PipeWriter};
 
 use crate::builtins;
 use crate::error::ShellError;
 use crate::executor::execute;
 use crate::parser::{parse_line, Command};
+use crate::args_analysis::redirection_analysis;
 
 
 // 主循环的功能是，不断接受输入调用handle_command解析命令，并处理Ctrl+C Ctrl+D
@@ -53,9 +54,19 @@ fn handle_command(
             exit(0);
         }
 
-        Ok(Command::Builtin(cmd, args)) => {
-            // 预先读取管道输入（如果有的话）
-            let piped_input = if let Some(mut pipe_reader) = input {
+        Ok(Command::Builtin(cmd, mut args)) => {
+            // 分析重定向符号
+            let redirection = match redirection_analysis(&mut args) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("psh: {}", e);
+                    return;
+                }
+            };
+
+            // 处理输入
+            let mut piped_input = if let Some(mut pipe_reader) = input {
+                // 从管道读取
                 let mut buffer = String::new();
                 match pipe_reader.read_to_string(&mut buffer) {
                     Ok(_) => Some(buffer),
@@ -68,11 +79,39 @@ fn handle_command(
                 None
             };
 
-            // 准备输出流
-            let mut writer: Box<dyn Write> = output
-                .map_or(Box::new(io::stdout()), |p| Box::new(p));
+            // 如果有输入重定向，读取文件内容
+            if let Some(input_file) = redirection.input_file {
+                match std::fs::read_to_string(&input_file) {
+                    Ok(content) => {
+                        // 如果已经有管道输入，合并它们；否则直接使用文件内容
+                        if let Some(ref mut pipe_data) = piped_input {
+                            pipe_data.push_str(&content);
+                        } else {
+                            piped_input = Some(content);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("psh: Failed to read input file '{}': {}", input_file, e);
+                        return;
+                    }
+                }
+            }
 
-            // 调用统一的内置命令接口
+            // 处理输出
+            let mut writer: Box<dyn Write> = if let Some(output_file) = redirection.output_file {
+                // 输出重定向到文件
+                match File::create(&output_file) {
+                    Ok(file) => Box::new(file),
+                    Err(e) => {
+                        eprintln!("psh: Failed to create output file '{}': {}", output_file, e);
+                        return;
+                    }
+                }
+            } else {
+                // 使用管道输出或标准输出
+                output.map_or(Box::new(io::stdout()), |p| Box::new(p))
+            };
+
             let result = match cmd.as_str() {
                 "cd" => builtins::builtin_cd(args, piped_input, &mut *writer),
                 "pwd" => builtins::builtin_pwd(args, piped_input, &mut *writer),
