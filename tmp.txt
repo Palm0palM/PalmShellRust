@@ -1,0 +1,11 @@
+./.env
+./.git
+./.claude
+./.gitignore
+./tmp.txt
+./chats
+./src
+./target
+./Cargo.lock
+./Cargo.toml
+./.idea

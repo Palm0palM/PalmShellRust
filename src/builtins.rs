@@ -1,6 +1,9 @@
 use std::env;
 use std::fs;
 use std::io::Write;
+use std::str::FromStr;
+use nix::sys::signal::{self, Signal};
+use nix::unistd::Pid;
 use crate::error::ShellError;
 use crate::model_call::llm_call;
 use crate::prompt;
@@ -93,4 +96,58 @@ pub fn builtin_model_call(args: Vec<String>, _piped_input: Option<String>, stdou
     writeln!(stdout, "{}", response)?;
 
     Ok(())
+}
+
+pub fn builtin_kill(args: Vec<String>, _piped_input: Option<String>, _stdout: &mut dyn Write) -> Result<(), ShellError> {
+    if args.is_empty() {
+        return Err(ShellError::BuiltinError("kill usage: kill [-s signal] pid".to_string()));
+    }
+
+    let mut signal = Signal::SIGTERM;
+    let mut pid_str = None;
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "-s" {
+             if let Some(sig_arg) = iter.next() {
+                 signal = parse_signal(sig_arg)?;
+             } else {
+                 return Err(ShellError::BuiltinError("kill: option requires an argument -- 's'".to_string()));
+             }
+        } else {
+            if pid_str.is_some() {
+                 return Err(ShellError::BuiltinError("kill: too many arguments".to_string()));
+            }
+            pid_str = Some(arg);
+        }
+    }
+
+    let pid_str = pid_str.ok_or_else(|| ShellError::BuiltinError("kill: usage: kill [-s signal] pid".to_string()))?;
+    let pid_num = pid_str.parse::<i32>().map_err(|_| ShellError::BuiltinError(format!("kill: illegal pid: {}", pid_str)))?;
+    let pid = Pid::from_raw(pid_num);
+
+    match signal::kill(pid, signal) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(ShellError::BuiltinError(format!("kill: {}", e))),
+    }
+}
+
+fn parse_signal(sig_str: &str) -> Result<Signal, ShellError> {
+    if let Ok(num) = sig_str.parse::<i32>() {
+        return Signal::try_from(num).map_err(|_| ShellError::BuiltinError(format!("kill: invalid signal number: {}", num)));
+    }
+
+    let upper = sig_str.to_uppercase();
+    if let Ok(s) = Signal::from_str(&upper) {
+        return Ok(s);
+    }
+    
+    if !upper.starts_with("SIG") {
+        let with_sig = format!("SIG{}", upper);
+        if let Ok(s) = Signal::from_str(&with_sig) {
+            return Ok(s);
+        }
+    }
+
+    Err(ShellError::BuiltinError(format!("kill: unknown signal: {}", sig_str)))
 }

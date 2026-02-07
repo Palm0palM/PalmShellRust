@@ -36,7 +36,5 @@ fn main() {
     let reader =  DefaultEditor::new().unwrap();
     dotenv().ok();
 
-    //fs::create_dir_all("chats").unwrap();
-
     run::main_loop(reader);
 }

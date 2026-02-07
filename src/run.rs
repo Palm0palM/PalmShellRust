@@ -119,6 +119,7 @@ fn handle_command(
                 "ls" => builtins::builtin_ls(args, piped_input, &mut *writer),
                 "grep" => builtins::builtin_grep(args, piped_input, &mut *writer),
                 "chat" => builtins::builtin_model_call(args, piped_input, &mut *writer),
+                "kill" => builtins::builtin_kill(args, piped_input, &mut *writer),
                 _ => return,
             };
 
