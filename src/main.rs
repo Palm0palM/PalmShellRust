@@ -1,6 +1,9 @@
 use rustyline::DefaultEditor;
 use dotenvy::dotenv;
 use owo_colors::OwoColorize;
+use std::env;
+use std::fs;
+use std::path::PathBuf;
 
 mod parser;
 mod builtins;
@@ -36,5 +39,28 @@ fn main() {
     let reader =  DefaultEditor::new().unwrap();
     dotenv().ok();
 
+    // 配置自定义二进制目录并添加到 PATH
+    setup_shell_environment();
+
     run::main_loop(reader);
+}
+
+fn setup_shell_environment() {
+    // 设定目录为 ~/.palm_shell/bin
+    if let Ok(home) = env::var("HOME") {
+        let mut bin_path = PathBuf::from(&home);
+        bin_path.push(".palm_shell");
+        bin_path.push("bin");
+
+        // 如果目录不存在则创建
+        if !bin_path.exists() {
+            let _ = fs::create_dir_all(&bin_path);
+        }
+
+        // 将其添加到 PATH 环境变量的最前面
+        if let Ok(current_path) = env::var("PATH") {
+            let new_path = format!("{}:{}", bin_path.display(), current_path);
+            unsafe{env::set_var("PATH", new_path);}
+        }
+    }
 }

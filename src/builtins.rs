@@ -132,16 +132,38 @@ pub fn builtin_kill(args: Vec<String>, _piped_input: Option<String>, _stdout: &m
     }
 }
 
+pub fn builtin_export(args: Vec<String>, _piped_input: Option<String>, _stdout: &mut dyn Write) -> Result<(), ShellError> {
+    for arg in args {
+        // 处理 KEY=VALUE 格式
+        if let Some((key, value)) = arg.split_once('=') {
+            if !key.is_empty() {
+                unsafe{ env::set_var(key, value); }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn builtin_env(_args: Vec<String>, _piped_input: Option<String>, stdout: &mut dyn Write) -> Result<(), ShellError> {
+    for (key, value) in env::vars() {
+        writeln!(stdout, "{}={}", key, value)?;
+    }
+    Ok(())
+}
+
 fn parse_signal(sig_str: &str) -> Result<Signal, ShellError> {
+    // 数字的情况
     if let Ok(num) = sig_str.parse::<i32>() {
         return Signal::try_from(num).map_err(|_| ShellError::BuiltinError(format!("kill: invalid signal number: {}", num)));
     }
 
+    // 信号全名的情况
     let upper = sig_str.to_uppercase();
     if let Ok(s) = Signal::from_str(&upper) {
         return Ok(s);
     }
-    
+
+    // 信号后缀的情况
     if !upper.starts_with("SIG") {
         let with_sig = format!("SIG{}", upper);
         if let Ok(s) = Signal::from_str(&with_sig) {

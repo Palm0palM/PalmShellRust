@@ -14,7 +14,6 @@ pub enum Command {
 
 // 在这种parse机制的处理逻辑中，& 符号会作用于多个管道连接起来的整体
 // 如果在管道连接的命令内部使用&，如 cmd & | cmd & 的形式，会出现解析错误
-// TODO: 处理管道命令内部使用&的情况
 pub fn parse_line(line: &str) -> Result<Command, ShellError> {
     // 去除空格
     let mut line = line.trim();
@@ -68,7 +67,7 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>
         let command = match cmd_name.as_str() {
             "exit" => Command::Exit,
             "quit" => Command::Empty,
-            "cd" | "pwd" | "echo" | "ls" | "grep" | "chat" | "kill" => Command::Builtin(cmd_name, args),
+            "cd" | "pwd" | "echo" | "ls" | "grep" | "chat" | "kill" | "export" | "env" => Command::Builtin(cmd_name, args),
             _ => Command::External(cmd_name, args),
         };
 

@@ -120,6 +120,8 @@ fn handle_command(
                 "grep" => builtins::builtin_grep(args, piped_input, &mut *writer),
                 "chat" => builtins::builtin_model_call(args, piped_input, &mut *writer),
                 "kill" => builtins::builtin_kill(args, piped_input, &mut *writer),
+                "export" => builtins::builtin_export(args, piped_input, &mut *writer),
+                "env" => builtins::builtin_env(args, piped_input, &mut *writer),
                 _ => return,
             };
 
