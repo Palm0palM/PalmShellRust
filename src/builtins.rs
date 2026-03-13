@@ -39,21 +39,6 @@ pub fn builtin_echo(args: Vec<String>, piped_input: Option<String>, stdout: &mut
     Ok(())
 }
 
-pub fn builtin_ls(args: Vec<String>, _piped_input: Option<String>, stdout: &mut dyn Write) -> Result<(), ShellError> {
-    let obj_path = match args.first() {
-        Some(path) => path.clone(),
-        None => ".".into(),
-    };
-
-    let paths = fs::read_dir(obj_path.as_str())?;
-
-    for path in paths {
-        writeln!(stdout, "{}", path.unwrap().path().display())?;
-    }
-
-    Ok(())
-}
-
 pub fn builtin_grep(mut args: Vec<String>, piped_input: Option<String>, stdout: &mut dyn Write) -> Result<(), ShellError> {
     // 获取搜索模式
     let pattern = match args.first() {

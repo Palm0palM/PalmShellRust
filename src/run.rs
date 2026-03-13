@@ -116,7 +116,6 @@ fn handle_command(
                 "cd" => builtins::builtin_cd(args, piped_input, &mut *writer),
                 "pwd" => builtins::builtin_pwd(args, piped_input, &mut *writer),
                 "echo" => builtins::builtin_echo(args, piped_input, &mut *writer),
-                "ls" => builtins::builtin_ls(args, piped_input, &mut *writer),
                 "grep" => builtins::builtin_grep(args, piped_input, &mut *writer),
                 "chat" => builtins::builtin_model_call(args, piped_input, &mut *writer),
                 "kill" => builtins::builtin_kill(args, piped_input, &mut *writer),
