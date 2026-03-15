@@ -129,11 +129,39 @@ fn handle_command(
             }
         }
 
-        Ok(Command::External(program, args)) => {
-            // 解析input和output。如果是None，map_or会父进程的io流，实际上就是Stdio
-            let stdin = input.map_or(Stdio::inherit(), Stdio::from);
-            let stdout = output.map_or(Stdio::inherit(), Stdio::from);
-
+        Ok(Command::External(program, mut args)) => {
+            let redirection = match redirection_analysis(&mut args) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("psh: {}", e);
+                    return;
+                }
+            };
+            
+            let stdin = if let Some(input_file) = redirection.input_file {
+                match File::open(&input_file) {
+                    Ok(file) => Stdio::from(file), // 将 File 转换为 Stdio
+                    Err(e) => {
+                        eprintln!("psh: Failed to open input file '{}': {}", input_file, e);
+                        return;
+                    }
+                }
+            } else {
+                input.map_or(Stdio::inherit(), Stdio::from)
+            };
+            
+            let stdout = if let Some(output_file) = redirection.output_file {
+                match File::create(&output_file) {
+                    Ok(file) => Stdio::from(file), // 将 File 转换为 Stdio
+                    Err(e) => {
+                        eprintln!("psh: Failed to create output file '{}': {}", output_file, e);
+                        return;
+                    }
+                }
+            } else {
+                output.map_or(Stdio::inherit(), Stdio::from)
+            };
+            
             match execute(&program, args, stdin, stdout) {
                 Ok(mut child) => {
                     if let Err(e) = child.wait() {

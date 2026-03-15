@@ -1,5 +1,4 @@
 use crate::error::ShellError;
-use std::env;
 // 这个Enum定义了Command的状态
 #[derive(Debug)]
 pub enum Command {
@@ -57,7 +56,8 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>
 
         let mut parsed : Vec<String> = cmd
             .split_whitespace()
-            .map(expand_tilde)
+            .map(|s| expand_env_vars(s)) // 第一步：展开 $变量
+            .map(|s| expand_tilde(&s))   // 第二步：展开 ~
             .collect();
 
         // 分割出命令名和参数
@@ -89,12 +89,44 @@ fn test_background(command: Command, is_background: bool) -> Result<Command, She
 
 // 检查并展开参数中的 ~
 fn expand_tilde(arg: &str) -> String {
-    if arg == "~" || arg.starts_with("~/") {
-        if let Ok(home) = env::var("HOME") {
-            // 将首个 ~ 替换为真实的家目录路径
-            return arg.replacen('~', &home, 1);
+    if let Ok(home) = std::env::var("HOME") {
+        let mut expanded = if arg == "~" || arg.starts_with("~/") {
+            arg.replacen('~', &home, 1)
+        } else {
+            arg.to_string()
+        };
+        
+        expanded = expanded.replace("=~/", &format!("={}/", home));
+        expanded = expanded.replace(":~/", &format!(":{}/", home));
+
+        return expanded;
+    }
+    arg.to_string()
+}
+
+fn expand_env_vars(arg: &str) -> String {
+    let mut result = String::new();
+    let mut chars = arg.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '$' {
+            let mut var_name = String::new();
+            // 向后读取由字母、数字或下划线组成的变量名
+            while let Some(&next_c) = chars.peek() {
+                if next_c.is_alphanumeric() || next_c == '_' {
+                    var_name.push(next_c);
+                    chars.next(); // 消耗该字符
+                } else {
+                    break;
+                }
+            }
+            // 尝试从环境中获取该变量的值，如果有就替换，没有就留空
+            if let Ok(val) = std::env::var(&var_name) {
+                result.push_str(&val);
+            }
+        } else {
+            result.push(c);
         }
     }
-    // 其他情况保留原样
-    arg.to_string()
+    result
 }
