@@ -1,5 +1,5 @@
 use crate::error::ShellError;
-
+use std::env;
 // 这个Enum定义了Command的状态
 #[derive(Debug)]
 pub enum Command {
@@ -57,7 +57,7 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>
 
         let mut parsed : Vec<String> = cmd
             .split_whitespace()
-            .map(String::from)
+            .map(expand_tilde)
             .collect();
 
         // 分割出命令名和参数
@@ -67,7 +67,7 @@ fn parse_command(cmd : &str, is_background: bool) -> Result<Command, ShellError>
         let command = match cmd_name.as_str() {
             "exit" => Command::Exit,
             "quit" => Command::Empty,
-            "cd" | "pwd" | "echo" | "ls" | "grep" | "chat" | "kill" | "export" | "env" => Command::Builtin(cmd_name, args),
+            "cd" | "pwd" | "echo" | "grep" | "chat" | "kill" | "export" | "env" => Command::Builtin(cmd_name, args),
             _ => Command::External(cmd_name, args),
         };
 
@@ -85,4 +85,16 @@ fn test_background(command: Command, is_background: bool) -> Result<Command, She
     } else {
         Ok(command)
     }
+}
+
+// 检查并展开参数中的 ~
+fn expand_tilde(arg: &str) -> String {
+    if arg == "~" || arg.starts_with("~/") {
+        if let Ok(home) = env::var("HOME") {
+            // 将首个 ~ 替换为真实的家目录路径
+            return arg.replacen('~', &home, 1);
+        }
+    }
+    // 其他情况保留原样
+    arg.to_string()
 }

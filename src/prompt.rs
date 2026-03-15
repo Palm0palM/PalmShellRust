@@ -47,7 +47,7 @@ pub fn get_prompt() -> String {
     prompt = if username == "root".to_string() {
         "\u{1F680} #".to_string()
     } else {
-        get_emoji() + " $"
+        "$".to_string()
     };
 
     // 用户名&主机
